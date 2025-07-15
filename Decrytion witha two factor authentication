@@ -1,0 +1,96 @@
+import random
+import smtplib
+from email.mime.text import MIMEText
+from Crypto.Cipher import AES
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+import base64
+import os
+# Function to send OTP via email
+def send_otp(email_address, otp):
+    sender_email = 'saishruthi695@gmail.com'  # Replace with your email
+    sender_password = 'tbfq ocei zjtt keib'  # Replace with your app password
+    recipient_email = 'saishruthi403@gmail.com' # The recipient's email address
+
+    subject = "Your OTP for File Decryption"
+    body = f"Your OTP for file decryption is: {otp}"
+
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = sender_email
+    msg['To'] = recipient_email
+
+    try:
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, recipient_email, msg.as_string())
+        server.quit()
+        print("OTP sent successfully!")
+    except Exception as e:
+        print(f"Failed to send OTP: {e}")
+
+# Function to generate a 6-digit OTP
+def generate_otp():
+    otp = random.randint(100000, 999999)
+    return otp
+
+# Function to verify the OTP entered by the user
+def verify_otp(expected_otp):
+    entered_otp = input("Enter the OTP sent to your email: ")
+    if entered_otp.isdigit() and int(entered_otp) == expected_otp:
+        print("OTP verified successfully!")
+        return True
+    else:
+        print("Invalid OTP. Decryption failed.")
+        return False
+
+# Function to decrypt the file after verifying OTP
+def decrypt_file(encrypted_file_path, aes_key_file_path, private_key_path, recipient_email):
+    # Generate and send OTP
+    otp = generate_otp()
+    send_otp(recipient_email, otp)
+
+    # Verify OTP before proceeding with decryption
+    if not verify_otp(otp):
+        return  # Exit if OTP verification fails
+
+    # Load the encrypted AES key
+    with open(aes_key_file_path, 'rb') as f:
+        encrypted_aes_key = f.read()
+
+    # Load the RSA private key
+    with open(private_key_path, 'rb') as f:
+        private_key = RSA.import_key(f.read())
+
+    # Decrypt the AES key using the RSA private key
+    cipher_rsa = PKCS1_OAEP.new(private_key)
+    aes_key = cipher_rsa.decrypt(encrypted_aes_key)
+
+    # Load the encrypted file
+    with open(encrypted_file_path, 'rb') as f:
+        nonce, tag, ciphertext = [f.read(x) for x in (16, 16, -1)]  # Nonce, tag, and ciphertext
+
+    # Decrypt the file using AES with the decrypted AES key
+    cipher_aes = AES.new(aes_key, AES.MODE_EAX, nonce=nonce)
+
+    try:
+        decrypted_data = cipher_aes.decrypt_and_verify(ciphertext, tag)
+        # Save the decrypted file
+        with open(f"decrypted_{os.path.basename(encrypted_file_path)}", 'wb') as f:
+            f.write(decrypted_data)
+        print("File decrypted successfully!")
+    except (ValueError, KeyError):
+        print("Error during AES decryption. Possible padding issue or tampered data.")
+
+# Example usage
+decrypt_file('sample.txt.encrypted', 'sample.txt.aes_key', 'private_key.pem', 'recipient@example.com')
+
+
+
+
+
+
+
+
+   
+
