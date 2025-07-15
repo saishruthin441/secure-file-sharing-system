@@ -1,0 +1,33 @@
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+import base64
+import os
+
+def encrypt_file(file_path, recipient_public_key_path):
+    # Generate AES session key
+    aes_key = get_random_bytes(16)
+
+    # Encrypt file with AES
+    with open(file_path, 'rb') as f:
+        file_data = f.read()
+    cipher_aes = AES.new(aes_key, AES.MODE_EAX)
+    ciphertext, tag = cipher_aes.encrypt_and_digest(file_data)
+
+    # Encrypt the AES session key with the recipient's RSA public key
+    with open(recipient_public_key_path, 'rb') as f:
+        recipient_public_key = RSA.import_key(f.read())
+    cipher_rsa = PKCS1_OAEP.new(recipient_public_key)
+    encrypted_aes_key = cipher_rsa.encrypt(aes_key)
+
+    # Save encrypted file and encrypted AES key
+    with open(f"{file_path}.encrypted", 'wb') as f:
+        [f.write(x) for x in (cipher_aes.nonce, tag, ciphertext)]
+    with open(f"{file_path}.aes_key", 'wb') as f:
+        f.write(encrypted_aes_key)
+
+    print("File encrypted successfully!")
+
+# Encrypt sample text file
+encrypt_file('sample.txt', 'public_key.pem')
